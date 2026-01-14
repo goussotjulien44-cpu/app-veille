@@ -6,20 +6,24 @@ import google.generativeai as genai
 st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
 # --- 2. CONNEXION IA (GEMINI) ---
-# Utilisation du secret configuré dans Streamlit Cloud
 API_KEY = st.secrets.get("API_KEY", "")
 
-if API_KEY:
+def initialiser_ia():
+    if not API_KEY:
+        return None
     try:
         genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        ia_disponible = True
-    except Exception:
-        ia_disponible = False
-else:
-    ia_disponible = False
+        # On utilise 'gemini-pro' qui est le nom de modèle le plus universellement accepté
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except:
+        try:
+            return genai.GenerativeModel('gemini-pro')
+        except:
+            return None
 
-# --- 3. INITIALISATION DES SUJETS (DIVISIONS PYXIS) ---
+model = initialiser_ia()
+
+# --- 3. INITIALISATION DES DIVISIONS ---
 if 'mes_sujets' not in st.session_state:
     st.session_state['mes_sujets'] = [
         "Mobilités (Ferroviaire & Aéroportuaire)",
@@ -31,13 +35,10 @@ if 'mes_sujets' not in st.session_state:
         "Administration, RH & DAF"
     ]
 
-# --- 4. DESIGN PERSONNALISÉ (MA-IA STYLE) ---
+# --- 4. DESIGN PERSONNALISÉ ---
 st.markdown("""
     <style>
-        /* Fond global et contraste */
         .stApp { background-color: #FFFFFF !important; }
-        
-        /* Barre latérale - Texte Noir sur Fond Gris clair */
         [data-testid="stSidebar"] {
             background-color: #F8F9FB !important;
             border-right: 1px solid #E0E0E0;
@@ -46,14 +47,7 @@ st.markdown("""
             color: #000000 !important;
             font-weight: 600 !important;
         }
-
-        /* Titres principaux */
-        h1, h2, h3 { 
-            color: #000000 !important; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        /* Cartes d'articles */
+        h1, h2, h3 { color: #000000 !important; }
         .article-card {
             background-color: #ffffff;
             padding: 18px;
@@ -62,78 +56,44 @@ st.markdown("""
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             margin-bottom: 15px;
-            height: 100%;
         }
-        .article-card b { color: #000000 !important; font-size: 1.1em; }
-        .article-card small { color: #6B7280 !important; }
-
-        /* Boutons noirs */
         div.stButton > button {
             background-color: #000000 !important;
             color: #FFFFFF !important;
-            border: none;
-            border-radius: 5px;
-            padding: 10px 20px;
             width: 100%;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. LOGIQUE D'ANALYSE IA ---
+# --- 5. LOGIQUE D'ANALYSE ---
 def generer_analyse(sujet, articles):
-    if not ia_disponible:
-        return "⚠️ L'IA est en attente de configuration (Clé API)."
+    if not model:
+        return "⚠️ L'IA n'est pas configurée. Vérifiez votre clé API dans les Secrets."
     
-    # Préparation des données pour l'IA (Titres uniquement pour la rapidité)
-    contexte_actus = "\n".join([f"- {a['title']}" for a in articles[:4]])
-    
-    prompt = f"""
-    Tu es l'expert stratégique du cabinet Pyxis Support. 
-    Analyse ces actualités pour la division : {sujet}.
-    Pyxis travaille sur des projets d'infrastructure (ferroviaire, portuaire), d'IT complexe et de marchés publics (AMO).
-    
-    CONSIGNES :
-    1. Rejette strictement le Canada et l'alimentation.
-    2. Explique en 3 points courts pourquoi ces actus sont importantes pour les clients de Pyxis.
-    3. Utilise un ton professionnel et direct.
-
-    ACTUALITÉS :
-    {contexte_actus}
-    """
+    titres = "\n".join([f"- {a['title']}" for a in articles[:4]])
+    prompt = f"Expert Pyxis Support : Analyse l'intérêt de ces actus pour la division '{sujet}' (Infrastructures, IT, Marchés publics). Rejette le Canada. Donne 2 points clés.\n\nTitres:\n{titres}"
     
     try:
         response = model.generate_content(prompt)
-        if response and response.text:
-            return response.text
-        return "Analyse en attente de données plus précises."
+        return response.text if response.text else "Analyse en attente."
     except Exception as e:
-        return f"Note : Synthèse en cours de mise à jour (Détail : {str(e)[:40]})."
+        return f"Analyse indisponible momentanément (Erreur : {str(e)[:30]})"
 
-# --- 6. INTERFACE UTILISATEUR ---
-
-# Barre latérale
+# --- 6. INTERFACE ---
 with st.sidebar:
-    # Logo Pyxis texte stylisé
     st.markdown("<h2 style='color:#00A3C1; margin-bottom:0;'>PYXIS</h2><h4 style='color:#777; margin-top:0;'>Support</h4>", unsafe_allow_html=True)
     st.write("---")
-    
-    st.subheader("⚙️ Configuration")
-    nouveau = st.text_input("Nouveau mot-clé :")
-    if st.button("Ajouter à la veille"):
+    nouveau = st.text_input("Ajouter un mot-clé :")
+    if st.button("Ajouter"):
         if nouveau and nouveau not in st.session_state['mes_sujets']:
-            st.session_state['mes_sujets'].append(nouveau)
-            st.rerun()
-            
+            st.session_state['mes_sujets'].append(nouveau); st.rerun()
     st.write("---")
-    st.subheader("📍 Vos Divisions")
     for s in st.session_state['mes_sujets']:
         c1, c2 = st.columns([5, 1])
         c1.write(s)
         if c2.button("X", key=f"del_{s}"):
-            st.session_state['mes_sujets'].remove(s)
-            st.rerun()
+            st.session_state['mes_sujets'].remove(s); st.rerun()
 
-# Zone principale
 st.markdown("<h1 style='text-align:center;'>Veille Stratégique Opérationnelle</h1>", unsafe_allow_html=True)
 
 if st.button("LANCER L'ANALYSE GLOBALE 🚀", use_container_width=True):
@@ -141,31 +101,15 @@ if st.button("LANCER L'ANALYSE GLOBALE 🚀", use_container_width=True):
         for sujet in st.session_state['mes_sujets']:
             st.write("---")
             st.subheader(f"📌 {sujet}")
-            
-            with st.spinner(f"Recherche et analyse pour {sujet}..."):
-                # Recherche d'actualités fr (limite 1 jour)
-                results = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=6))
-                
+            with st.spinner("Analyse..."):
+                results = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=5))
                 if results:
-                    col_ia, col_news = st.columns([1, 1.2])
-                    
-                    with col_ia:
-                        st.markdown("**Synthèse Stratégique Pyxis :**")
-                        analyse = generer_analyse(sujet, results)
-                        st.info(analyse)
-                    
-                    with col_news:
-                        st.markdown("**Sources recommandées :**")
-                        for art in results[:3]: # Affiche les 3 meilleurs articles
-                            st.markdown(f"""
-                                <div class="article-card">
-                                    <a href="{art['url']}" target="_blank" style="text-decoration:none;">
-                                        <b>{art['title']}</b>
-                                    </a><br>
-                                    <small>{art['source']} • {art['date']}</small>
-                                </div>
-                            """, unsafe_allow_html=True)
+                    col1, col2 = st.columns([1, 1.2])
+                    with col1:
+                        st.markdown("**Synthèse Pyxis :**")
+                        st.info(generer_analyse(sujet, results))
+                    with col2:
+                        for art in results[:3]:
+                            st.markdown(f"<div class='article-card'><a href='{art['url']}' target='_blank' style='text-decoration:none; color:#000;'><b>{art['title']}</b></a><br><small>{art['source']}</small></div>", unsafe_allow_html=True)
                 else:
-                    st.write("Aucune actualité critique détectée ces dernières 24h.")
-
-# --- FIN DU CODE ---
+                    st.write("Aucune actualité détectée.")
