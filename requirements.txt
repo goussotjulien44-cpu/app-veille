@@ -1,3 +1,3 @@
+google-generativeai
+duckduckgo_search
 streamlit
-duckduckgo-search
-pandas
