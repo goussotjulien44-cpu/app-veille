@@ -1,93 +1,116 @@
 import streamlit as st
 from duckduckgo_search import DDGS
 
-# --- CONFIGURATION (Structure Stable) ---
-st.set_page_config(page_title="Veille Stratégique - Pyxis", page_icon="⚖️", layout="wide")
+# --- CONFIGURATION INITIALE ---
+st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
-# --- MÉMOIRE ---
+# --- MÉMOIRE DES DONNÉES ---
 if 'mes_sujets' not in st.session_state:
     st.session_state['mes_sujets'] = ["Intelligence Artificielle", "Marchés Publics"]
 
-# --- DESIGN ROBUSTE (Noir & Blanc MA-IA) ---
+# --- DESIGN HAUT CONTRASTE (STYLE MA-IA) ---
 st.markdown("""
     <style>
-        /* Fond blanc et police propre */
-        .stApp { background-color: #FFFFFF; font-family: 'Helvetica', sans-serif; }
+        /* Fond global et police */
+        .stApp { background-color: #FFFFFF; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        /* Titre principal bien visible */
-        .main-title { text-align: center; color: #1A1A1A; font-weight: bold; padding: 20px; }
+        /* Titre Principal : NOIR PROFOND pour lisibilité totale */
+        .main-title { 
+            text-align: center; 
+            color: #000000 !important; 
+            font-weight: 800; 
+            font-size: 2.8em; 
+            padding: 20px;
+            margin-bottom: 10px;
+        }
 
-        /* Style des boutons noirs avec texte BLANC */
+        /* Barre latérale : Texte Noir */
+        [data-testid="stSidebar"] { background-color: #F0F2F6; border-right: 2px solid #D1D5DB; }
+        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {
+            color: #000000 !important;
+            font-weight: 600;
+        }
+
+        /* Cartes d'actualités avec bordure visible */
+        .article-card {
+            background-color: #ffffff;
+            padding: 18px;
+            border: 1px solid #E5E7EB;
+            border-top: 6px solid #C5A059;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            height: 100%;
+        }
+        
+        /* Titres des articles en NOIR */
+        .article-card b { color: #000000 !important; font-size: 1.15em; display: block; margin-top: 5px; }
+        .article-card a { text-decoration: none; }
+        .article-card a:hover b { color: #C5A059 !important; }
+
+        /* Boutons Noirs / Texte Blanc */
         div.stButton > button {
             background-color: #000000 !important;
             color: #FFFFFF !important;
-            border-radius: 4px;
-            font-weight: bold;
             border: none;
+            font-weight: bold;
+            font-size: 1.1em;
             width: 100%;
+            padding: 10px;
         }
-        
-        /* Cartes d'articles */
-        .article-card {
-            background-color: #ffffff;
-            padding: 20px;
-            border-top: 4px solid #C5A059;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 15px;
-        }
-        
-        /* Sidebar grise comme MA-IA */
-        [data-testid="stSidebar"] { background-color: #F8F9FA; border-right: 1px solid #EEE; }
-        
-        /* Logo Texte Pyxis */
-        .pyxis-logo { color: #00A3C1; font-weight: bold; font-size: 24px; margin-bottom: 20px; }
+
+        /* Titres des sections de recherche */
+        h3 { color: #000000 !important; font-weight: 700; border-bottom: 2px solid #C5A059; padding-bottom: 5px; margin-top: 30px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIQUE RECHERCHE ---
+# --- FONCTION DE RECHERCHE ---
 def get_news(topic):
     try:
         with DDGS() as ddgs:
             return list(ddgs.news(topic, region="fr-fr", timelimit="d", max_results=8))
     except: return []
 
-# --- INTERFACE ---
+# --- CONSTRUCTION DE L'INTERFACE ---
 
-# Barre Latérale (Sidebar)
 with st.sidebar:
-    # Si l'image ne charge pas, on met un beau texte stylé
-    st.markdown("<div class='pyxis-logo'>PYXIS <span style='color:#777;'>Support</span></div>", unsafe_allow_html=True)
-    st.markdown("### ⚙️ Configuration")
+    # LOGO RECRÉÉ (Boussole + Nom)
+    col_logo1, col_logo2 = st.columns([1, 4])
+    with col_logo1:
+        st.markdown("<h2 style='margin:0;'>🧭</h2>", unsafe_allow_html=True) # Icône stable
+    with col_logo2:
+        st.markdown("<div style='color:#00A3C1; font-size:22px; font-weight:bold; line-height:1;'>PYXIS<br><span style='color:#777; font-size:16px;'>Support</span></div>", unsafe_allow_html=True)
     
-    nouveau = st.text_input("Ajouter un mot-clé :", placeholder="ex: Innovation")
-    if st.button("Valider l'ajout"):
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("⚙️ Configuration")
+    
+    nouveau = st.text_input("Ajouter un mot-clé :", key="add_input")
+    if st.button("Valider l'ajout ➕"):
         if nouveau and nouveau not in st.session_state['mes_sujets']:
             st.session_state['mes_sujets'].append(nouveau)
             st.rerun()
 
     st.markdown("---")
-    st.subheader("📍 Vos flux")
+    st.subheader("📍 Vos Sujets de Veille")
     for s in st.session_state['mes_sujets']:
-        c1, c2 = st.columns([4, 1])
-        c1.write(s)
+        c1, c2 = st.columns([5, 1])
+        # On force l'affichage en noir pour les mots-clés
+        c1.markdown(f"<span style='color:black;'>• {s}</span>", unsafe_allow_html=True)
         if c2.button("X", key=f"del_{s}"):
             st.session_state['mes_sujets'].remove(s)
             st.rerun()
 
-# Zone Centrale
+# CONTENU CENTRAL
 st.markdown("<h1 class='main-title'>Veille Stratégique Opérationnelle</h1>", unsafe_allow_html=True)
 
-# Bouton d'action
 c_a, c_b, c_c = st.columns([1, 2, 1])
 with c_b:
     if st.button("LANCER L'ANALYSE DU JOUR 🚀"):
-        st.session_state['search_active'] = True
+        st.session_state['active_search'] = True
 
-# Résultats
-if st.session_state.get('search_active'):
+if st.session_state.get('active_search'):
     for sujet in st.session_state['mes_sujets']:
-        st.write(f"### 📌 {sujet}")
+        st.markdown(f"### 📌 Sujet : {sujet}")
         articles = get_news(sujet)
         if articles:
             g1, g2 = st.columns(2)
@@ -95,11 +118,13 @@ if st.session_state.get('search_active'):
                 with (g1 if i % 2 == 0 else g2):
                     st.markdown(f"""
                         <div class="article-card">
-                            <small style="color:#C5A059;">{art.get('source')} • {art.get('date')}</small><br>
-                            <a href="{art.get('url')}" target="_blank" style="text-decoration:none; color:#222; font-weight:bold;">
-                                {art.get('title')}
+                            <span style="color:#C5A059; font-size:0.85em; font-weight:bold;">
+                                {art.get('source')} • {art.get('date')}
+                            </span>
+                            <a href="{art.get('url')}" target="_blank">
+                                <b>{art.get('title')}</b>
                             </a>
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info(f"Aucun article trouvé pour '{sujet}'.")
+            st.info(f"Aucune actualité trouvée pour '{sujet}' (dernières 24h).")
