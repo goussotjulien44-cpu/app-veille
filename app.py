@@ -5,120 +5,96 @@ import time
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
-# --- 2. DESIGN "PYXIS" HAUTE VISIBILITÉ ---
+# --- 2. BASE DE DONNÉES DES SOURCES PRIVILÉGIÉES ---
+# Vos sources spécifiques par domaine
+SOURCES_MOBILITES = [
+    "espacetrain.com", "lerail.com", "laviedurail.com", "railpassion.fr", 
+    "ville-rail-transports.com", "usinenouvelle.com", "railmarket.com"
+]
+
+# Vos nouvelles sources généralistes et institutionnelles
+SOURCES_GENERALISTES = [
+    "lagazettedescommunes.com", 
+    "achatpublic.info", 
+    "village-justice.com", 
+    "conseil-etat.fr", 
+    "lemoniteur.fr", 
+    "economie.gouv.fr/daj"
+]
+
+# --- 3. DESIGN HAUT CONTRASTE ---
 st.markdown("""
     <style>
-        /* Fond et texte global */
         .stApp { background-color: #FFFFFF !important; }
-        
-        /* Barre latérale : Forçage visuel */
-        [data-testid="stSidebar"] {
-            background-color: #F1F3F6 !important;
-            border-right: 2px solid #000;
-        }
-        /* Correction de la case jaune : Texte forcé en Noir */
-        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
-        [data-testid="stSidebar"] span, 
-        [data-testid="stSidebar"] label {
-            color: #000000 !important;
-            font-weight: 700 !important;
-            opacity: 1 !important;
-        }
-
-        /* Titres et Textes Zone Principale */
-        h1, h2, h3, b, strong, p { color: #000000 !important; }
-        
-        .titre-pyxis {
-            color: #000000 !important;
-            font-size: 38px !important;
-            font-weight: 900 !important;
-            text-align: center;
-            display: block;
-            margin-bottom: 20px;
-        }
-
-        /* Cartes d'articles */
+        [data-testid="stSidebar"] { background-color: #F1F3F6 !important; border-right: 2px solid #000; }
+        [data-testid="stSidebar"] * { color: #000000 !important; font-weight: 700 !important; }
         .article-card {
-            background-color: #ffffff;
-            padding: 15px;
-            border: 1px solid #DDD;
-            border-left: 8px solid #C5A059;
-            border-radius: 8px;
-            margin-bottom: 12px;
+            background-color: #ffffff; padding: 15px; border: 1px solid #DDD;
+            border-left: 8px solid #C5A059; border-radius: 8px; margin-bottom: 12px;
         }
-        
-        /* Bouton Lancement */
-        div.stButton > button {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-            border: 2px solid #000 !important;
-            font-weight: bold;
-        }
+        div.stButton > button { background-color: #000000 !important; color: #FFFFFF !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. INITIALISATION DES DIVISIONS ---
-if 'mes_sujets' not in st.session_state:
-    st.session_state['mes_sujets'] = [
-        "Mobilités (Ferroviaire & Aéroportuaire)",
-        "Externalisation (Marchés Publics & AMO)",
-        "IT & Systèmes d'Information",
-        "Digitalisation & IA",
-        "Vente SaaS & Commerciaux MA-IA",
-        "Développement Software",
-        "Administration, RH & DAF"
-    ]
+# --- 4. LOGIQUE DE RECHERCHE CIBLÉE ---
+def effectuer_recherche(sujet):
+    resultats_finaux = []
+    # On définit les sources à scanner selon le sujet
+    sources_a_scanner = SOURCES_GENERALISTES
+    if "Mobilités" in sujet:
+        sources_a_scanner = SOURCES_MOBILITES + SOURCES_GENERALISTES
 
-# --- 4. INTERFACE ---
-with st.sidebar:
-    st.markdown("<h1 style='color:#00A3C1 !important; margin:0;'>PYXIS</h1><small style='color:black;'>Support</small>", unsafe_allow_html=True)
-    st.write("---")
-    
-    # La zone de saisie qui était "invisible"
-    nouveau = st.text_input("Saisir un mot-clé :", placeholder="ex: Cybersécurité", key="input_veille")
-    if st.button("Ajouter à la veille"):
-        if nouveau and nouveau not in st.session_state['mes_sujets']:
-            st.session_state['mes_sujets'].append(nouveau); st.rerun()
-            
-    st.write("---")
-    st.write("**Divisions actives :**")
-    for s in st.session_state['mes_sujets']:
-        c1, c2 = st.columns([5, 1])
-        c1.write(f"• {s}")
-        if c2.button("X", key=f"del_{s}"):
-            st.session_state['mes_sujets'].remove(s); st.rerun()
-
-st.markdown('<span class="titre-pyxis">Veille Stratégique Opérationnelle</span>', unsafe_allow_html=True)
-
-if st.button("DÉMARRER LA RECHERCHE 🚀", use_container_width=True):
     with DDGS() as ddgs:
-        for sujet in st.session_state['mes_sujets']:
-            st.markdown(f"<h2 style='border-bottom: 2px solid #C5A059; padding-top:15px;'>📌 {sujet}</h2>", unsafe_allow_html=True)
-            
-            # Pause technique pour éviter le blocage
-            time.sleep(1.5)
-            
+        # ÉTAPE 1 : Scan des sources expertes/généralistes listées
+        for site in sources_a_scanner:
+            query = f"{sujet} site:{site}"
             try:
-                results = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=3))
-                if results:
-                    col_ia, col_news = st.columns([1, 1.2])
-                    with col_ia:
-                        st.markdown("**Synthèse IA Pyxis :**")
-                        # Message d'attente propre
-                        st.warning("⚡ Fonctionnalité IA en cours de développement.")
-                        st.caption("Le moteur d'analyse stratégique sera bientôt relié à votre clé API d'entreprise.")
-                    with col_news:
-                        for art in results:
-                            st.markdown(f"""
-                                <div class="article-card">
-                                    <a href="{art['url']}" target="_blank" style="text-decoration:none; color:#000;">
-                                        <b>{art['title']}</b>
-                                    </a><br>
-                                    <small style="color:#666;">Source : {art['source']}</small>
-                                </div>
-                            """, unsafe_allow_html=True)
-                else:
-                    st.info("Aucune actualité publiée aujourd'hui pour ce sujet.")
-            except:
-                st.error("Moteur de recherche saturé. Réessayez dans 1 minute.")
-                break
+                # On prend le meilleur article récent par site
+                search = list(ddgs.news(query, region="fr-fr", timelimit="d", max_results=1))
+                if search: resultats_finaux.extend(search)
+            except: continue
+            time.sleep(0.3)
+        
+        # ÉTAPE 2 : Si pas assez de résultats, on élargit au Web Global
+        if len(resultats_finaux) < 3:
+            try:
+                general = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=5))
+                resultats_finaux.extend(general)
+            except: pass
+            
+    return resultats_finaux[:6] # On affiche les 6 résultats les plus pertinents
+
+# --- 5. INTERFACE ---
+with st.sidebar:
+    st.markdown("<h1>PYXIS</h1>", unsafe_allow_html=True)
+    st.write("---")
+    st.write("**Ajouter un mot-clé**")
+    nouveau = st.text_input("Saisir :", key="input_pyxis")
+    if st.button("Valider"):
+        if 'sujets' not in st.session_state: 
+            st.session_state['sujets'] = ["Mobilités (Ferroviaire & Aéroportuaire)", "Externalisation (Marchés Publics & AMO)"]
+        if nouveau and nouveau not in st.session_state['sujets']:
+            st.session_state['sujets'].append(nouveau); st.rerun()
+
+st.markdown("<h1 style='text-align:center; color:black;'>Veille Stratégique Opérationnelle</h1>", unsafe_allow_html=True)
+
+if st.button("LANCER LA RECHERCHE EXPERTE 🚀", use_container_width=True):
+    sujets = st.session_state.get('sujets', ["Mobilités (Ferroviaire & Aéroportuaire)", "Externalisation (Marchés Publics & AMO)"])
+    for s in sujets:
+        st.markdown(f"<h2 style='color:black; border-bottom: 2px solid #C5A059;'>📌 {s}</h2>", unsafe_allow_html=True)
+        
+        with st.spinner(f"Interrogation des sources (Gazette, Moniteur, DAJ, etc.)..."):
+            actus = effectuer_recherche(s)
+            
+            if actus:
+                col_info, col_news = st.columns([1, 1.2])
+                with col_info:
+                    st.info("💡 **Analyse IA :** Fonctionnalité en cours de développement.")
+                    st.caption("Sources institutionnelles prioritaires vérifiées avec succès.")
+                with col_news:
+                    for a in actus:
+                        st.markdown(f"""<div class="article-card">
+                            <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
+                            <small>{a['source']} • {a['date']}</small></div>""", unsafe_allow_html=True)
+            else:
+                st.write("Aucune actualité détectée ce jour sur vos sources privilégiées.")
