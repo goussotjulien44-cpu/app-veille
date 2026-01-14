@@ -2,13 +2,13 @@ import streamlit as st
 from duckduckgo_search import DDGS
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Veille Stratégique - MA-IA", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Veille Stratégique - Pyxis Support", page_icon="🤖", layout="wide")
 
 # --- MÉMOIRE ---
 if 'mes_sujets' not in st.session_state:
     st.session_state['mes_sujets'] = ["Intelligence Artificielle", "Marchés Publics"]
 
-# --- DESIGN ÉPURÉ (STABLE) ---
+# --- DESIGN ÉPURÉ MA-IA ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
@@ -16,7 +16,6 @@ st.markdown("""
         
         .main-title { text-align: center; font-weight: 700; font-size: 2.2em; color: #333; margin-bottom: 20px; }
         
-        /* Cartes Articles Style MA-IA */
         .article-card {
             background-color: #ffffff;
             padding: 1.5rem;
@@ -27,18 +26,30 @@ st.markdown("""
             height: 100%;
         }
         
-        /* Forcer le texte du bouton principal en BLANC */
+        /* Bouton principal Noir texte Blanc */
         div.stButton > button:first-child {
             background-color: #000000 !important;
             color: #ffffff !important;
             border: none;
             padding: 0.6rem 2rem;
             font-weight: bold;
+            width: 100%;
         }
 
-        /* Liens */
         .article-card a { text-decoration: none; color: #1a1a1a !important; font-size: 1.1em; }
         .article-card a:hover { color: #C5A059 !important; }
+
+        /* Style spécifique pour les boutons X de suppression */
+        .stButton button[kind="secondary"] {
+            background-color: #000 !important;
+            color: #fff !important;
+            border-radius: 50%;
+            border: none;
+            width: 25px;
+            height: 25px;
+            padding: 0;
+            line-height: 1;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -50,11 +61,12 @@ def get_news(topic):
     except: return []
 
 # --- INTERFACE ---
-st.markdown("<h1 class='main-title'>Bienvenue sur votre Veille Stratégique</h1>", unsafe_allow_html=True)
 
 # Barre Latérale
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3649/3649238.png", width=50) # Icone neutre
+    # INSERTION DU LOGO PYXIS (URL extraite de votre environnement)
+    st.image("https://pyxis-support.app/img/logo-pyxis.png", width=180)
+    st.markdown("---")
     st.title("Configuration")
     
     with st.expander("➕ Ajouter un sujet", expanded=True):
@@ -68,15 +80,17 @@ with st.sidebar:
     st.subheader("📍 Sujets actifs")
     for s in st.session_state['mes_sujets']:
         cols = st.columns([4, 1])
-        cols[0].write(s)
+        cols[0].write(f"• {s}")
         if cols[1].button("X", key=f"del_{s}"):
             st.session_state['mes_sujets'].remove(s)
             st.rerun()
 
 # Zone Centrale
+st.markdown("<h1 class='main-title'>Bienvenue sur votre Veille Stratégique</h1>", unsafe_allow_html=True)
+
 col_a, col_b, col_c = st.columns([1, 2, 1])
 with col_b:
-    btn_search = st.button("LANCER L'ANALYSE QUOTIDIENNE 🚀", use_container_width=True)
+    btn_search = st.button("LANCER L'ANALYSE QUOTIDIENNE 🚀")
 
 if btn_search or 'results' in st.session_state:
     st.session_state['results'] = True
@@ -85,7 +99,6 @@ if btn_search or 'results' in st.session_state:
         st.markdown(f"### 📌 {sujet}")
         res = get_news(sujet)
         if res:
-            # Affichage en grille de 2 colonnes
             grid_cols = st.columns(2)
             for i, art in enumerate(res):
                 with grid_cols[i % 2]:
