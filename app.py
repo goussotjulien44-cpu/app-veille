@@ -1,6 +1,7 @@
 import streamlit as st
 from duckduckgo_search import DDGS
 import google.generativeai as genai
+import time
 
 # --- 1. CONFIGURATION IA ---
 if "API_KEY" in st.secrets:
@@ -11,96 +12,87 @@ else:
 
 st.set_page_config(page_title="Veille Pyxis Support", layout="wide")
 
-# --- 2. DESIGN FIX (VISIBILITÉ BOUTON ET INTERFACE) ---
+# --- 2. DESIGN FIX (BOUTON CLAIR & VISIBILITÉ) ---
 st.markdown("""
     <style>
-        /* Fond d'application blanc */
         .stApp { background-color: #FFFFFF !important; color: #000000 !important; }
         
-        /* Sidebar : Texte noir sur fond gris clair pour visibilité maximale */
+        /* Sidebar : Texte noir sur fond gris clair */
         [data-testid="stSidebar"] { background-color: #F0F2F6 !important; border-right: 2px solid #000; }
         [data-testid="stSidebar"] * { color: #000000 !important; font-weight: 700 !important; }
         
-        /* Titres */
-        .main-title { color: #000; font-size: 32px; font-weight: 900; text-align: center; margin-bottom: 20px; }
-        .titre-service { color: #000; font-weight: 900; font-size: 18px; border-bottom: 3px solid #C5A059; margin-top: 20px; }
-        
-        /* Bouton Lancer la veille : Couleur claire, texte noir */
+        /* Bouton Lancer : Gris clair pour contraste avec texte noir */
         div.stButton > button:first-child {
-            background-color: #E0E0E0 !important;
+            background-color: #F0F2F6 !important;
             color: #000000 !important;
-            border: 2px solid #000000 !important;
+            border: 1px solid #000000 !important;
             font-weight: bold !important;
         }
 
-        /* Cartes articles */
+        .main-title { color: #000; font-size: 32px; font-weight: 900; text-align: center; margin-bottom: 20px; }
+        .titre-service { color: #000; font-weight: 900; font-size: 18px; border-bottom: 3px solid #C5A059; margin-top: 20px; }
         .article-card { background-color: #fdfdfd; padding: 10px; border: 1px solid #ddd; border-left: 6px solid #C5A059; border-radius: 5px; margin-bottom: 8px; }
         
-        /* Bloc Analyse Pyxis (Bleu clair comme convenu) */
+        /* Bloc Analyse Pyxis : Bleu clair avec message d'attente */
         .analyse-box { background-color: #E3F2FD; border: 1px solid #2196F3; padding: 15px; border-radius: 8px; color: #1976D2; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. MOTEUR IA AVEC MESSAGE DE DÉVELOPPEMENT ---
+# --- 3. MOTEUR IA ET DÉDOUBLONNAGE ---
 def traiter_ia_expert(liste_brute, service):
     if not liste_brute: return [], "Aucune actualité détectée."
     
     titres_concat = "\n".join([f"- {a['title']} (URL: {a['url']})" for a in liste_brute])
     
-    # Prompt optimisé pour le dédoublonnage sémantique
     prompt = f"""
-    Analyse ces articles pour le service {service}.
-    1. Supprime les doublons (ne garde qu'un seul article par sujet même si les titres diffèrent).
-    2. Sélectionne les 4 plus stratégiques.
-    Réponds UNIQUEMENT avec les URLs, une par ligne.
+    En tant qu'analyste, trie ces articles pour le service {service}.
+    1. Supprime les doublons thématiques (ne garde qu'un article par sujet).
+    2. Sélectionne les 4 articles les plus stratégiques.
+    Réponds UNIQUEMENT avec les URLs choisies, une par ligne.
+    Articles :
     {titres_concat}
     """
     
     try:
         response = model.generate_content(prompt).text
-        urls_part = response.strip().split("\n")
-        final_articles = [a for a in liste_brute if a['url'] in [u.strip() for u in urls_part]]
-        
-        # On remplace l'analyse réelle par le message convenu
-        message_dev = "Fonctionnalité IA en cours de développement."
-        return final_articles[:4], message_dev
+        urls_uniques = [u.strip() for u in response.strip().split("\n") if "http" in u]
+        final_articles = [a for a in liste_brute if a['url'] in urls_uniques]
+        return final_articles[:4], "Analyse IA : Fonctionnalité en cours de développement."
     except:
-        return liste_brute[:4], "Fonctionnalité IA en cours de développement."
+        return liste_brute[:4], "Analyse IA : Fonctionnalité en cours de développement."
 
 # --- 4. INTERFACE ---
 if 'sujets' not in st.session_state:
-    st.session_state['sujets'] = [
-        "Mobilités (Ferroviaire & Aéroportuaire)", 
-        "Externalisation (Marchés Publics & AMO)", 
-        "IT & Systèmes d'Information",
-        "Digitalisation & IA"
-    ]
+    st.session_state['sujets'] = ["Mobilités (Ferroviaire & Aéroportuaire)", "Externalisation (Marchés Publics & AMO)", "IT & Systèmes d'Information", "Digitalisation & IA"]
 
 with st.sidebar:
     st.markdown("### ⚖️ PYXIS SUPPORT")
     for s in st.session_state['sujets']:
-        c1, c2 = st.columns([5, 1])
+        c1, c2 = st.columns([5, 1.2])
         c1.write(s)
         if c2.button("X", key=f"d_{s}"):
             st.session_state['sujets'].remove(s); st.rerun()
 
 st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', unsafe_allow_html=True)
 
-# Bouton avec style corrigé (clair/texte noir)
 if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
     for sujet in st.session_state['sujets']:
         st.markdown(f'<div class="titre-service">📌 {sujet}</div>', unsafe_allow_html=True)
-        with DDGS() as ddgs:
-            raw = list(ddgs.news(sujet, region="fr-fr", timelimit="w", max_results=25))
-        
-        actus, analyse = traiter_ia_expert(raw, sujet)
-        
-        col1, col2 = st.columns([1, 1.4])
-        with col1:
-            # Encadré d'analyse avec le message fixe convenu
-            st.markdown(f'<div class="analyse-box">💡 <b>Analyse IA :</b><br>{analyse}</div>', unsafe_allow_html=True)
-        with col2:
-            for a in actus:
-                st.markdown(f"""<div class="article-card">
-                    <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
-                    <small>{a['source']}</small></div>""", unsafe_allow_html=True)
+        try:
+            with DDGS() as ddgs:
+                raw = list(ddgs.news(sujet, region="fr-fr", timelimit="w", max_results=20))
+                # Petite pause pour éviter le blocage DuckDuckGo
+                time.sleep(0.5) 
+            
+            actus, message_ia = traiter_ia_expert(raw, sujet)
+            
+            col1, col2 = st.columns([1, 1.4])
+            with col1:
+                st.markdown(f'<div class="analyse-box">💡 <b>Analyse IA :</b><br>{message_ia}</div>', unsafe_allow_html=True)
+            with col2:
+                for a in actus:
+                    st.markdown(f"""<div class="article-card">
+                        <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
+                        <small>{a['source']}</small></div>""", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Erreur lors de la recherche pour {sujet}. DuckDuckGo limite peut-être les requêtes.")
