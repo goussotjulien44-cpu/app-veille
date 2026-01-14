@@ -5,122 +5,108 @@ import time
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
-# --- 2. DESIGN "ULTRA-LISIBLE" ---
+# --- 2. DICTIONNAIRE DES MOTS-CLÉS ÉLARGIS ---
+MOTS_CLES_EXPERTS = {
+    "Mobilités (Ferroviaire & Aéroportuaire)": "SNCF OR RATP OR RER OR SYSTRA OR EGIS OR 'PYXIS SUPPORT' OR 'trains régionaux' OR train OR métro OR tramway OR avions OR aéroport",
+    "Externalisation (Marchés Publics & AMO)": "BOAMP OR PLACE OR 'marchés publics' OR 'profil acheteur' OR 'Conseil d'Etat' OR consultations OR AMO OR 'commande publique'",
+    "IT & Systèmes d'Information": "Gouvernance SI OR 'Schéma directeur informatique' OR 'Cloud souverain' OR Infogérance OR ERP",
+    "Digitalisation & IA": "Transformation digitale OR 'IA générative' OR RPA OR Dématérialisation OR Data",
+    "Vente SaaS & Commerciaux MA-IA": "SaaS France OR 'Logiciel en tant que service' OR 'Business Development IA'",
+    "Développement Software": "DevOps OR 'Méthodes Agiles' OR 'Cybersécurité applicative' OR API",
+    "Administration, RH & DAF": "RH OR 'Droit social' OR 'direction administrative et financière' OR impôt OR 'droit du travail'"
+}
+
+# --- 3. SOURCES PRIVILÉGIÉES ---
+SOURCES_MOBILITES = ["espacetrain.com", "lerail.com", "laviedurail.com", "ville-rail-transports.com", "usinenouvelle.com"]
+SOURCES_GENERALISTES = ["lagazettedescommunes.com", "achatpublic.info", "village-justice.com", "lemoniteur.fr", "economie.gouv.fr/daj"]
+
+# --- 4. DESIGN & VISIBILITÉ ---
 st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF !important; }
         
-        /* Barre latérale : Fond gris clair, texte noir */
-        [data-testid="stSidebar"] {
-            background-color: #F8F9FB !important;
-            border-right: 2px solid #EEE;
-        }
+        /* Sidebar : Correction visuelle complète */
+        [data-testid="stSidebar"] { background-color: #F8F9FB !important; border-right: 2px solid #000; }
+        [data-testid="stSidebar"] * { color: #000000 !important; font-weight: 700 !important; }
         
-        /* Forçage de la couleur de TOUS les textes en noir dans la sidebar */
-        [data-testid="stSidebar"] p, 
-        [data-testid="stSidebar"] span, 
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] li {
+        /* Boutons de suppression (X) : Gris clair avec croix noire visible */
+        div[data-testid="stSidebar"] button {
+            background-color: #EEEEEE !important;
             color: #000000 !important;
-            font-weight: 600 !important;
-        }
-
-        /* Bouton de suppression (X) : Fond gris clair, texte noir pour visibilité */
-        div[data-testid="stVerticalBlock"] div[data-testid="stHorizontalBlock"] button {
-            background-color: #E0E0E0 !important;
-            color: #000000 !important;
-            border: 1px solid #CCC !important;
-            border-radius: 4px !important;
-            height: 25px !important;
-            padding: 0px 10px !important;
-        }
-        
-        /* Survol des boutons de suppression */
-        div[data-testid="stVerticalBlock"] div[data-testid="stHorizontalBlock"] button:hover {
-            background-color: #FF4B4B !important;
-            color: white !important;
-        }
-
-        .titre-pyxis {
-            color: #000000 !important; font-size: 38px !important;
-            font-weight: 900 !important; text-align: center; display: block; margin-bottom: 20px;
+            border: 1px solid #000000 !important;
+            font-size: 14px !important;
+            padding: 2px 10px !important;
         }
         
         .article-card {
             background-color: #ffffff; padding: 15px; border: 1px solid #DDD;
             border-left: 8px solid #C5A059; border-radius: 8px; margin-bottom: 12px;
         }
-
-        /* Bouton principal Noir/Blanc */
+        
         div.stButton > button:first-child {
-            background-color: #000000 !important;
-            color: #FFFFFF !important;
-            font-weight: bold !important;
+            background-color: #000000 !important; color: #FFFFFF !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIQUE ET SERVICES ---
-SERVICES_INITIAUX = [
-    "Mobilités (Ferroviaire & Aéroportuaire)",
-    "Externalisation (Marchés Publics & AMO)",
-    "IT & Systèmes d'Information",
-    "Digitalisation & IA",
-    "Vente SaaS & Commerciaux MA-IA",
-    "Développement Software",
-    "Administration, RH & DAF"
-]
-
-if 'sujets' not in st.session_state:
-    st.session_state['sujets'] = SERVICES_INITIAUX.copy()
-
-# --- 4. LOGIQUE DE RECHERCHE ---
-def effectuer_recherche(sujet):
+# --- 5. LOGIQUE DE RECHERCHE OPTIMISÉE ---
+def effectuer_recherche(service_name):
+    query = MOTS_CLES_EXPERTS.get(service_name, service_name)
     resultats = []
+    
     with DDGS() as ddgs:
+        # Étape 1 : Recherche sur les sources expertes
+        sources = SOURCES_MOBILITES + SOURCES_GENERALISTES if "Mobilités" in service_name else SOURCES_GENERALISTES
+        for site in sources[:3]:
+            try:
+                search = list(ddgs.news(f"{query} site:{site}", region="fr-fr", timelimit="d", max_results=1))
+                if search: resultats.extend(search)
+            except: continue
+        
+        # Étape 2 : Recherche Web Globale pour ne rien rater
         try:
-            # Recherche élargie pour garantir des résultats
-            res = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=5))
-            if res: resultats.extend(res)
+            general = list(ddgs.news(query, region="fr-fr", timelimit="d", max_results=5))
+            if general: resultats.extend(general)
         except: pass
-    return resultats
+            
+    # Dédoublonnage
+    seen = set()
+    return [x for x in resultats if not (x['url'] in seen or seen.add(x['url']))][:5]
 
-# --- 5. INTERFACE SIDEBAR ---
+# --- 6. INTERFACE ---
+if 'sujets' not in st.session_state:
+    st.session_state['sujets'] = list(MOTS_CLES_EXPERTS.keys())
+
 with st.sidebar:
-    st.markdown("<h2 style='color:#00A3C1;'>PYXIS</h2><p>Support</p>", unsafe_allow_html=True)
+    st.markdown("<h2>PYXIS</h2>", unsafe_allow_html=True)
     st.write("---")
-    nouveau = st.text_input("Ajouter un service :", placeholder="ex: Cybersécurité")
+    nouveau = st.text_input("Ajouter un mot-clé :", key="add_input")
     if st.button("Ajouter +"):
         if nouveau and nouveau not in st.session_state['sujets']:
             st.session_state['sujets'].append(nouveau); st.rerun()
-    
     st.write("---")
-    st.markdown("**Gérer l'affichage :**")
     for s in st.session_state['sujets']:
         col_txt, col_del = st.columns([4, 1])
-        col_txt.markdown(f"<small>{s}</small>", unsafe_allow_html=True)
-        # La croix est maintenant noire sur fond gris clair
+        col_txt.write(f"• {s}")
         if col_del.button("X", key=f"del_{s}"):
-            st.session_state['sujets'].remove(s)
-            st.rerun()
+            st.session_state['sujets'].remove(s); st.rerun()
 
-# --- 6. ZONE PRINCIPALE ---
-st.markdown('<span class="titre-pyxis">Veille Stratégique Opérationnelle</span>', unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:black;'>Veille Stratégique Opérationnelle</h1>", unsafe_allow_html=True)
 
-if st.button("LANCER LA RECHERCHE GLOBALE 🚀", use_container_width=True):
+if st.button("DÉMARRER LA VEILLE EXPERTE 🚀", use_container_width=True):
     for sujet in st.session_state['sujets']:
         st.markdown(f"<h3 style='color:black; border-bottom: 2px solid #C5A059;'>📌 {sujet}</h3>", unsafe_allow_html=True)
-        with st.spinner("Recherche en cours..."):
-            time.sleep(1)
+        with st.spinner(f"Scan des sources pour {sujet}..."):
+            time.sleep(1.5)
             actus = effectuer_recherche(sujet)
             if actus:
                 c1, c2 = st.columns([1, 1.2])
                 with c1:
-                    st.info("💡 Analyse IA en cours de déploiement.")
+                    st.info("💡 Analyse IA : Fonctionnalité en développement.")
                 with c2:
-                    for a in actus[:3]:
+                    for a in actus:
                         st.markdown(f"""<div class="article-card">
                             <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
-                            <small>{a['source']}</small></div>""", unsafe_allow_html=True)
+                            <small>{a['source']} • {a['date']}</small></div>""", unsafe_allow_html=True)
             else:
-                st.write("Aucun résultat pour ce service aujourd'hui.")
+                st.write("Aucune actualité détectée ce jour.")
