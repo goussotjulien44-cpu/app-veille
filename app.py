@@ -5,12 +5,17 @@ import google.generativeai as genai
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Veille Stratégique Pyxis", page_icon="⚖️", layout="wide")
 
-# --- CLE API GEMINI ---
-API_KEY = st.secrets["API_KEY"] if "API_KEY" in st.secrets else "VOTRE_CLE_ICI"
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- CLE API GEMINI (Sécurisée) ---
+# On essaie de récupérer la clé dans les secrets, sinon on met une valeur vide
+API_KEY = st.secrets.get("API_KEY", "")
 
-# --- INITIALISATION DES SUJETS (DIVISIONS) ---
+if API_KEY:
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.warning("⚠️ Clé API manquante. L'analyse IA est désactivée. Ajoutez 'API_KEY' dans les Secrets de Streamlit.")
+
+# --- INITIALISATION DES DIVISIONS ---
 if 'mes_sujets' not in st.session_state:
     st.session_state['mes_sujets'] = [
         "Mobilités (Ferroviaire & Aéroportuaire)",
@@ -22,51 +27,55 @@ if 'mes_sujets' not in st.session_state:
         "Administration, RH & DAF"
     ]
 
-# --- DESIGN HAUT CONTRASTE ---
+# --- DESIGN HAUT CONTRASTE (MA-IA Style) ---
 st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF; }
-        .main-title { text-align: center; color: #000000; font-weight: 800; font-size: 2.5em; margin-bottom: 20px; }
+        h1, h2, h3, p, span, label { color: #000000 !important; font-family: 'Segoe UI', sans-serif; }
+        .main-title { text-align: center; font-weight: 800; font-size: 2.5em; margin-bottom: 20px; color: #000 !important; }
         .article-card {
-            background-color: #ffffff; padding: 20px; border: 1px solid #EEE;
-            border-top: 5px solid #C5A059; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px;
+            background-color: #ffffff; padding: 18px; border: 1px solid #EEE;
+            border-top: 5px solid #C5A059; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px;
         }
-        h1, h2, h3, p, span, label { color: #000000 !important; }
-        div.stButton > button { background-color: #000 !important; color: #fff !important; font-weight: bold; width: 100%; }
+        div.stButton > button { background-color: #000 !important; color: #fff !important; font-weight: bold; width: 100%; border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIQUE IA AVEC CONTEXTE PYXIS ---
+# --- LOGIQUE IA ---
 def analyser_ia(sujet, articles):
+    if not API_KEY: return "Analyse IA indisponible (Clé manquante)."
     if not articles: return "Aucun article trouvé."
+    
     txt = "\n".join([f"- {a['title']} (Source: {a['source']})" for a in articles])
     prompt = f"""
     Tu es l'expert stratégique de Pyxis Support (AMO Marchés Publics, IT, Mobilités).
-    Sujet : {sujet}
-    TACHE : Sélectionne les 4 articles les plus critiques pour le cabinet.
-    FILTRE : Rejette le Canada, le Québec et les marchés physiques (alimentaire).
-    RÉPONSE : Une liste avec le titre et pourquoi c'est important pour Pyxis (1 phrase).
+    Analyse pour la division : {sujet}.
+    TACHE : Sélectionne les 4 articles les plus critiques pour Pyxis Support.
+    FILTRE : Rejette strictement le Canada, le Québec et les marchés alimentaires.
+    RÉPONSE : Une liste avec le titre et l'intérêt stratégique pour Pyxis.
     ARTICLES : {txt}
     """
     try:
         return model.generate_content(prompt).text
-    except:
-        return "Erreur d'analyse IA."
+    except Exception as e:
+        return f"Erreur IA : {str(e)}"
 
 # --- INTERFACE ---
 with st.sidebar:
-    st.markdown("<div style='color:#00A3C1; font-size:22px; font-weight:bold;'>PYXIS <span style='color:#777;'>Support</span></div>", unsafe_allow_html=True)
+    # Logo Pyxis texte (pour éviter les erreurs de chargement d'image)
+    st.markdown("<div style='color:#00A3C1; font-size:24px; font-weight:bold; line-height:1.1;'>PYXIS<br><span style='color:#777; font-size:18px;'>Support</span></div>", unsafe_allow_html=True)
     st.write("---")
-    st.subheader("⚙️ Configurer les flux")
+    st.subheader("⚙️ Configuration")
     nouveau = st.text_input("Ajouter un mot-clé :")
     if st.button("Ajouter +"):
-        st.session_state['mes_sujets'].append(nouveau)
-        st.rerun()
+        if nouveau and nouveau not in st.session_state['mes_sujets']:
+            st.session_state['mes_sujets'].append(nouveau)
+            st.rerun()
     st.write("---")
-    st.subheader("📍 Divisions & Sujets")
+    st.subheader("📍 Divisions actives")
     for s in st.session_state['mes_sujets']:
         c1, c2 = st.columns([5,1])
-        c1.write(f"• {s}")
+        c1.markdown(f"<span style='color:black;'>• {s}</span>", unsafe_allow_html=True)
         if c2.button("X", key=s):
             st.session_state['mes_sujets'].remove(s)
             st.rerun()
@@ -77,14 +86,23 @@ if st.button("LANCER L'ANALYSE DES DIVISIONS 🚀"):
     with DDGS() as ddgs:
         for sujet in st.session_state['mes_sujets']:
             st.markdown(f"### 📌 {sujet}")
-            with st.spinner("Tri par IA..."):
+            with st.spinner("Analyse intelligente en cours..."):
                 raw = list(ddgs.news(sujet, region="fr-fr", timelimit="d", max_results=8))
                 if raw:
                     col1, col2 = st.columns([1, 1])
                     with col1:
+                        st.markdown("**Synthèse Stratégique :**")
                         st.info(analyser_ia(sujet, raw))
                     with col2:
+                        st.markdown("**Sources recommandées :**")
                         for a in raw[:4]:
-                            st.markdown(f"<div class='article-card'><a href='{a['url']}' target='_blank'><b>{a['title']}</b></a><br><small>{a['source']}</small></div>", unsafe_allow_html=True)
+                            st.markdown(f"""
+                                <div class='article-card'>
+                                    <a href='{a['url']}' target='_blank' style='text-decoration:none; color:#000;'>
+                                        <b>{a['title']}</b>
+                                    </a><br>
+                                    <small style='color:#C5A059;'>{a['source']} • {a['date']}</small>
+                                </div>
+                            """, unsafe_allow_html=True)
                 else:
-                    st.write("Pas d'actualité aujourd'hui.")
+                    st.write("Pas d'actualité pertinente aujourd'hui.")
