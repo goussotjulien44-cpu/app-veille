@@ -5,51 +5,90 @@ import time
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
-# --- 2. RECADRAGE EXTENSIF (OUVERTURE DES FILTRES) ---
+# --- 2. RECADRAGE EXTENSIF ET SÉMANTIQUE (OUVERTURE MAXIMALE) ---
 MOTS_CLES_PYXIS = {
-    "Mobilités (Ferroviaire & Aéroportuaire)": "SNCF OR RER OR RATP OR SYSTRA OR EGIS OR Tramway OR Métro OR 'Loi-cadre transports' OR Ferroviaire OR Aéroport",
-    "Externalisation (Marchés Publics & AMO)": "BOAMP OR PLACE OR 'Marchés publics' OR 'Commande publique' OR 'Conseil d'Etat' OR 'Appel d'offres' OR AMO",
-    "IT & Systèmes d'Information": "'Gouvernance SI' OR 'Urbanisation SI' OR 'Schéma Directeur' OR 'Cloud souverain' OR 'DSI'",
-    "Digitalisation & IA": "'IA générative' OR 'Transformation digitale' OR RPA OR 'Intelligence Artificielle' OR Dématérialisation",
+    "Mobilités (Ferroviaire & Aéroportuaire)": "SNCF OR RER OR RATP OR SYSTRA OR EGIS OR Tramway OR Métro OR 'Loi-cadre' OR 'Loi de programmation' OR 'LOM' OR Ferroviaire OR Aéroport",
+    "Externalisation (Marchés Publics & AMO)": "BOAMP OR PLACE OR 'Marchés publics' OR 'Commande publique' OR 'Conseil d'Etat' OR 'Appel d'offres' OR AMO OR 'Profil acheteur'",
+    "IT & Systèmes d'Information": "'Gouvernance SI' OR 'Urbanisation SI' OR 'Schéma Directeur' OR 'Cloud souverain' OR 'DSI' OR 'Schéma directeur informatique'",
+    "Digitalisation & IA": "'IA générative' OR 'Transformation digitale' OR RPA OR 'Intelligence Artificielle' OR Dématérialisation OR 'IA agentique'",
     "Vente SaaS & Commerciaux MA-IA": "'Éditeur SaaS' OR 'Logiciel SaaS' OR 'Go-to-market' OR 'SaaS France' OR 'Business Development'",
     "Développement Software": "DevOps OR 'Méthodes Agiles' OR 'Qualité logicielle' OR 'Dette technique' OR 'API Management'",
-    "Administration, RH & DAF": "RH OR 'Droit social' OR 'Réforme fiscale' OR 'Facturation électronique' OR 'Droit du travail'"
+    "Administration, RH & DAF": "RH OR 'Droit social' OR 'Réforme fiscale' OR 'Facturation électronique' OR 'Droit du travail' OR 'DAF'"
 }
 
-# --- 3. DESIGN HAUT CONTRASTE ---
+# --- 3. DESIGN HAUT CONTRASTE & VISIBILITÉ (FIX) ---
 st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF !important; }
+        
+        /* Sidebar : Noir sur Gris clair pour visibilité maximale */
         [data-testid="stSidebar"] { background-color: #F0F2F6 !important; border-right: 3px solid #000; }
         [data-testid="stSidebar"] * { color: #000000 !important; font-weight: 800 !important; }
-        .main-title { color: #000000 !important; font-size: 40px !important; font-weight: 900 !important; text-align: center; }
-        .titre-service { color: #000000 !important; font-weight: 900 !important; font-size: 22px; border-bottom: 3px solid #C5A059; margin-top: 20px; }
-        div[data-testid="stSidebar"] button { background-color: #E0E0E0 !important; color: #000000 !important; border: 2px solid #000 !important; }
-        .article-card { background-color: #ffffff; padding: 15px; border: 1px solid #000; border-left: 10px solid #C5A059; border-radius: 8px; margin-bottom: 10px; }
+        
+        /* Titres : Noir pur */
+        .main-title { color: #000000 !important; font-size: 40px !important; font-weight: 900 !important; text-align: center; margin-bottom: 20px; }
+        .titre-service { color: #000000 !important; font-weight: 900 !important; font-size: 22px; border-bottom: 3px solid #C5A059; margin-top: 25px; padding-bottom: 5px; }
+        
+        /* Boutons de suppression (X) : Fond gris, bordure et texte noirs */
+        div[data-testid="stSidebar"] button { 
+            background-color: #E0E0E0 !important; 
+            color: #000000 !important; 
+            border: 2px solid #000 !important; 
+            font-weight: 900 !important;
+        }
+        
+        /* Cartes articles */
+        .article-card { 
+            background-color: #ffffff; 
+            padding: 15px; 
+            border: 1px solid #000; 
+            border-left: 10px solid #C5A059; 
+            border-radius: 8px; 
+            margin-bottom: 10px; 
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        /* Bouton Lancer : Noir */
+        div.stButton > button:first-child { 
+            background-color: #000000 !important; 
+            color: #FFFFFF !important; 
+            font-weight: bold !important; 
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. MOTEUR DE RECHERCHE PROFOND ---
+# --- 4. MOTEUR DE RECHERCHE HYBRIDE (NEWS + WEB) ---
 def effectuer_recherche(service_label):
     query = MOTS_CLES_PYXIS.get(service_label, service_label)
     resultats = []
     seen_urls = set()
     
     with DDGS() as ddgs:
+        # Étape A : Recherche dans l'actualité (7 derniers jours)
         try:
-            # On scanne 30 résultats (au lieu de 10) pour ne rien rater
-            search_results = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=30))
-            
-            for art in search_results:
+            news_results = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=20))
+            for art in news_results:
                 if art['url'] not in seen_urls:
-                    # On exclut quand même les termes parasites très précis pour "Externalisation"
-                    if "casino" not in art['title'].lower():
-                        resultats.append(art)
-                        seen_urls.add(art['url'])
-        except:
-            pass
+                    resultats.append(art)
+                    seen_urls.add(art['url'])
+        except: pass
+
+        # Étape B : Recherche Web Globale (Filet de sécurité pour les articles de fond)
+        if len(resultats) < 5:
+            try:
+                web_results = list(ddgs.text(query, region="fr-fr", timelimit="w", max_results=15))
+                for art in web_results:
+                    if art['href'] not in seen_urls:
+                        resultats.append({
+                            'title': art['title'],
+                            'url': art['href'],
+                            'source': 'Web (Recherche Profonde)',
+                            'date': 'Récent'
+                        })
+                        seen_urls.add(art['href'])
+            except: pass
             
-    return resultats[:5] # On affiche jusqu'à 5 articles par section
+    return resultats[:5]
 
 # --- 5. INTERFACE ---
 if 'sujets' not in st.session_state:
@@ -58,13 +97,14 @@ if 'sujets' not in st.session_state:
 with st.sidebar:
     st.markdown("## PYXIS SUPPORT")
     st.write("---")
-    nouveau = st.text_input("Saisir un mot-clé :", key="new_key")
+    nouveau = st.text_input("Saisir un mot-clé :", key="add_key")
     if st.button("AJOUTER +"):
         if nouveau and nouveau not in st.session_state['sujets']:
             st.session_state['sujets'].append(nouveau); st.rerun()
     st.write("---")
+    st.markdown("### Gérer l'affichage")
     for s in st.session_state['sujets']:
-        c1, c2 = st.columns([4, 1])
+        c1, c2 = st.columns([4, 1.2])
         c1.write(f"**{s}**")
         if c2.button("X", key=f"del_{s}"):
             st.session_state['sujets'].remove(s); st.rerun()
@@ -74,11 +114,12 @@ st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', u
 if st.button("LANCER LA VEILLE GLOBALE 🚀", use_container_width=True):
     for sujet in st.session_state['sujets']:
         st.markdown(f'<div class="titre-service">📌 {sujet}</div>', unsafe_allow_html=True)
-        with st.spinner(f"Scan large de l'actualité pour {sujet}..."):
+        with st.spinner(f"Analyse News & Web pour {sujet}..."):
             actus = effectuer_recherche(sujet)
             if actus:
                 col_ia, col_news = st.columns([1, 1.4])
                 with col_ia:
+                    # Bloc IA avec message fixe
                     st.info("💡 **Analyse IA :** Fonctionnalité en cours de développement.")
                 with col_news:
                     for a in actus:
@@ -86,4 +127,4 @@ if st.button("LANCER LA VEILLE GLOBALE 🚀", use_container_width=True):
                             <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
                             <small>Source : {a['source']} | {a['date']}</small></div>""", unsafe_allow_html=True)
             else:
-                st.write("*Aucun article trouvé avec les nouveaux filtres.*")
+                st.write("*Aucune actualité pertinente détectée.*")
