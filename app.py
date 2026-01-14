@@ -6,23 +6,17 @@ import time
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Veille Pyxis Support", page_icon="⚖️", layout="wide")
 
-# --- 2. CONNEXION IA (GEMINI) ---
+# --- 2. CONNEXION IA ROBUSTE ---
 API_KEY = st.secrets.get("API_KEY", "")
 
 def initialiser_ia():
     if not API_KEY: return None
     try:
         genai.configure(api_key=API_KEY)
-        # Configuration avec tolérance maximale pour éviter les blocages de réponse
-        return genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-        )
+        # On demande à Google quel modèle est réellement disponible pour éviter la 404
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target_model = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in available_models else 'models/gemini-pro'
+        return genai.GenerativeModel(target_model)
     except: return None
 
 model = initialiser_ia()
@@ -39,52 +33,59 @@ if 'mes_sujets' not in st.session_state:
         "Administration, RH & DAF"
     ]
 
-# --- 4. DESIGN HAUT CONTRASTE (FORCE NOIR SUR BLANC) ---
+# --- 4. DESIGN "ZERO TRANSPARENCE" (HAUT CONTRASTE) ---
 st.markdown("""
     <style>
-        /* Fond global */
+        /* Fond global forcé en blanc */
         .stApp { background-color: #FFFFFF !important; }
         
-        /* Titre Principal forcé en Noir pur */
-        .titre-noir {
+        /* Titre Principal : Noir Pur, 100% Opaque */
+        .titre-pyxis {
             color: #000000 !important;
+            font-size: 42px !important;
+            font-weight: 900 !important;
             text-align: center;
-            font-size: 2.5em;
-            font-weight: 800;
-            margin-bottom: 30px;
             display: block;
+            padding: 20px 0;
+            opacity: 1 !important;
         }
 
-        /* Barre latérale - Contraste maximum */
+        /* Barre latérale : Forçage Noir sur Gris */
         [data-testid="stSidebar"] {
-            background-color: #F0F2F6 !important;
-            border-right: 2px solid #000;
+            background-color: #F1F3F6 !important;
+            border-right: 3px solid #000000;
         }
-        [data-testid="stSidebar"] * {
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
+        [data-testid="stSidebar"] span, 
+        [data-testid="stSidebar"] label {
             color: #000000 !important;
-            font-weight: 700 !important;
+            font-weight: 800 !important;
+            opacity: 1 !important;
         }
         
-        /* Texte des articles et titres de sections */
-        h1, h2, h3, p, span, li {
+        /* Forçage de tous les titres de sections en noir */
+        h1, h2, h3, b, strong {
             color: #000000 !important;
+            opacity: 1 !important;
         }
 
-        /* Cartes d'articles */
+        /* Cartes d'articles avec bordures visibles */
         .article-card {
-            background-color: #ffffff;
-            padding: 15px;
-            border: 2px solid #EEEEEE;
-            border-left: 8px solid #C5A059;
-            border-radius: 10px;
+            background-color: #ffffff !important;
+            padding: 20px;
+            border: 2px solid #000000 !important;
+            border-left: 10px solid #C5A059 !important;
+            border-radius: 8px;
             margin-bottom: 15px;
         }
-        
-        /* Boutons Noirs */
+        .article-card b { font-size: 1.2em; }
+
+        /* Boutons Noirs Pleine Opacité */
         div.stButton > button {
             background-color: #000000 !important;
             color: #FFFFFF !important;
-            border: 2px solid #000;
+            border: 2px solid #000000 !important;
+            opacity: 1 !important;
             font-weight: bold;
         }
     </style>
@@ -92,44 +93,39 @@ st.markdown("""
 
 # --- 5. LOGIQUE D'ANALYSE ---
 def generer_analyse(sujet, articles):
-    if not model: return "⚠️ IA non connectée (Vérifiez la clé API)."
-    
+    if not model: return "⚠️ IA non connectée."
     titres = "\n".join([f"- {a['title']}" for a in articles[:3]])
-    prompt = f"Expert Pyxis Support : Analyse ces titres pour '{sujet}' (Infrastructures, IT, Marchés publics). Rejette le Canada. Donne 2 points clés courts.\n\n{titres}"
-    
+    prompt = f"Expert Pyxis : Analyse ces titres pour '{sujet}'. Sois pro et concis (3 lignes). Rejette le Canada.\n\n{titres}"
     try:
         response = model.generate_content(prompt)
-        if response and response.text:
-            return response.text
-        return "Analyse en attente (Contenu filtré par Google)."
+        return response.text if response.text else "Analyse en attente."
     except Exception as e:
-        return f"IA indisponible : {str(e)[:50]}"
+        return f"Calcul en cours... (Synchro IA)"
 
 # --- 6. INTERFACE ---
 with st.sidebar:
-    st.markdown("<h2 style='color:#00A3C1;'>PYXIS</h2><p>Support</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='color:#00A3C1 !important;'>PYXIS</h1>", unsafe_allow_html=True)
     st.write("---")
-    st.subheader("⚙️ Configuration")
-    nouveau = st.text_input("Ajouter un mot-clé :", key="add_input")
-    if st.button("Ajouter +"):
+    nouveau = st.text_input("Ajouter un mot-clé :", key="new_topic_input")
+    if st.button("Ajouter à la liste"):
         if nouveau and nouveau not in st.session_state['mes_sujets']:
             st.session_state['mes_sujets'].append(nouveau); st.rerun()
     st.write("---")
     for s in st.session_state['mes_sujets']:
         c1, c2 = st.columns([5, 1])
-        c1.write(s)
+        c1.write(f"**{s}**")
         if c2.button("X", key=f"del_{s}"):
             st.session_state['mes_sujets'].remove(s); st.rerun()
 
-# Utilisation d'une classe CSS spécifique pour le titre
-st.markdown("<span class='titre-noir'>Veille Stratégique Opérationnelle</span>", unsafe_allow_html=True)
+# Affichage du titre principal avec la classe "titre-pyxis"
+st.markdown('<span class="titre-pyxis">Veille Stratégique Opérationnelle</span>', unsafe_allow_html=True)
 
-if st.button("LANCER L'ANALYSE GLOBALE 🚀", use_container_width=True):
+if st.button("DÉMARRER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
     with DDGS() as ddgs:
         for sujet in st.session_state['mes_sujets']:
-            st.markdown(f"<h2 style='color:black;'>📌 {sujet}</h2>", unsafe_allow_html=True)
+            st.markdown(f"<h2 style='border-bottom: 2px solid black; padding-top:20px;'>📌 {sujet}</h2>", unsafe_allow_html=True)
             
-            # Délai pour éviter le blocage DuckDuckGo
+            # Pause de sécurité pour éviter le bannissement DuckDuckGo
             time.sleep(2)
             
             try:
@@ -137,20 +133,20 @@ if st.button("LANCER L'ANALYSE GLOBALE 🚀", use_container_width=True):
                 if results:
                     col1, col2 = st.columns([1, 1.2])
                     with col1:
-                        st.markdown("<b style='color:black;'>Synthèse Pyxis :</b>", unsafe_allow_html=True)
+                        st.markdown("<b style='font-size:1.1em;'>Analyse Pyxis Support :</b>", unsafe_allow_html=True)
                         st.info(generer_analyse(sujet, results))
                     with col2:
                         for art in results[:3]:
                             st.markdown(f"""
                                 <div class="article-card">
-                                    <a href="{art['url']}" target="_blank" style="text-decoration:none; color:#000;">
+                                    <a href="{art['url']}" target="_blank" style="text-decoration:none; color:#000000 !important;">
                                         <b>{art['title']}</b>
                                     </a><br>
-                                    <small style="color:#666;">{art['source']}</small>
+                                    <small style="color:#444 !important;">Source : {art['source']}</small>
                                 </div>
                             """, unsafe_allow_html=True)
                 else:
-                    st.write("Aucune actualité détectée ce jour.")
+                    st.write("Rien de nouveau aujourd'hui sur ce sujet.")
             except:
-                st.error("Recherche saturée. Attendez 30 secondes.")
+                st.error("Trop de requêtes. Veuillez patienter 1 minute.")
                 break
