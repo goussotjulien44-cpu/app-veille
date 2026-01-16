@@ -6,7 +6,7 @@ import time
 # --- 1. CONFIGURATION IA ---
 if "API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["API_KEY"])
-    # CONFIGURATION STRICTE : Température à 0 pour supprimer toute "créativité" de tri
+    # TEMPÉRATURE À 0 : Rigueur absolue, aucune créativité tolérée
     generation_config = {"temperature": 0.0, "top_p": 1, "top_k": 1}
     model = genai.GenerativeModel('gemini-1.5-flash', generation_config=generation_config)
 else:
@@ -44,27 +44,29 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. MOTEUR IA : ANALYSE PROFONDE (TITRE + CONTENU) ---
+# --- 4. MOTEUR IA : FILTRE "ANTI-DOUBLON" AGRESSIF ---
 def traiter_ia_expert(liste_brute, service):
     if not liste_brute: return [], "Aucune actualité détectée."
     
-    # ON INJECTE MAINTENANT LE 'BODY' (EXTRAIT) POUR QUE L'IA VOIT QUE C'EST LA MÊME HISTOIRE
-    data_concat = "\n".join([f"ID: {a['url']}\nTITRE: {a['title']}\nEXTRAIT: {a.get('body', '')}\n---" for a in liste_brute])
+    # On concatène Titre + Snippet pour donner du contexte
+    data_concat = "\n".join([f"ID: {a['url']}\nTITRE: {a['title']}\nCONTENU: {a.get('body', 'Pas de résumé')}\n---" for a in liste_brute])
     
+    # NOUVEAU PROMPT "MARTEAU-PILON"
     prompt = f"""
-    Tu es un éditeur en chef impitoyable pour le service {service}.
-    Ta mission : Éliminer la redondance médiatique.
+    Tu es un expert en veille stratégique pour le service {service}.
+    Ta tâche est de nettoyer le flux d'actualités.
     
-    Règles strictes :
-    1. Lis les TITRES et les EXTRAITS.
-    2. Si plusieurs articles parlent du même événement (ex: Loi-cadre, Grève, Contrat spécifique), garde UNIQUEMENT l'article qui semble le plus informatif. Jette les autres.
-    3. Je préfère avoir 1 seul article pertinent que 4 articles répétitifs.
-    4. Ne sélectionne JAMAIS plus de 4 articles.
+    CONSIGNE DE DÉDOUBLONNAGE RADICALE :
+    1. Regroupe les articles par "Événement Déclencheur".
+    2. Si plusieurs articles parlent de la même loi, de la même grève ou du même projet (ex: 'Loi-cadre rail'), c'est le MÊME événement.
+    3. Peu importe si l'un parle finances et l'autre syndicats : si l'événement de base est le même, garde UN SEUL article (le plus informatif).
+    4. Jette impitoyablement les autres doublons.
     
-    Données à analyser :
+    FORMAT DE RÉPONSE :
+    Renvoie uniquement la liste des URLs retenues (maximum 4). Si tout parle de la même chose, renvoie 1 seule URL.
+    
+    Articles à trier :
     {data_concat}
-    
-    Réponds UNIQUEMENT par la liste des IDs (URLs) retenues, une par ligne. Rien d'autre.
     """
     try:
         response = model.generate_content(prompt).text
@@ -97,6 +99,7 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
         raw = []
         success = False
         
+        # BOUCLE DE TENTATIVE (RETRY LOGIC)
         for attempt in range(2):
             try:
                 with st.spinner(f"Analyse approfondie pour {sujet}..."):
@@ -105,10 +108,13 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
                     if raw:
                         success = True
                         break
-            except:
-                if attempt == 0: time.sleep(5)
+            except Exception: # On attrape large pour inclure RatelimitException
+                if attempt == 0: 
+                    time.sleep(5) # Pause longue en cas d'erreur
                 continue
-        time.sleep(1.8)
+        
+        # Pause allongée pour éviter le crash "RateLimit" (Image fournie)
+        time.sleep(2.5)
 
         if success:
             actus, message_ia = traiter_ia_expert(raw, sujet)
@@ -117,10 +123,10 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
                 st.markdown(f'<div class="analyse-box">💡 <b>Analyse IA :</b><br>{message_ia}</div>', unsafe_allow_html=True)
             with col2:
                 if len(actus) == 0:
-                    st.info("Aucune actualité majeure unique détectée ce jour.")
+                    st.info("Aucune actualité unique majeure identifiée.")
                 for a in actus:
                     st.markdown(f"""<div class="article-card">
                         <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
                         <small>{a['source']}</small></div>""", unsafe_allow_html=True)
         else:
-            st.error(f"Le flux pour {sujet} est saturé.")
+            st.error(f"Flux indisponible pour {sujet} (Source saturée ou inaccessible).")
