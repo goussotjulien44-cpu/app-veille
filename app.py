@@ -6,9 +6,11 @@ import time
 # --- 1. CONFIGURATION IA ---
 if "API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # CONFIGURATION STRICTE : Température à 0 pour supprimer toute "créativité" de tri
+    generation_config = {"temperature": 0.0, "top_p": 1, "top_k": 1}
+    model = genai.GenerativeModel('gemini-1.5-flash', generation_config=generation_config)
 else:
-    st.error("ERREUR : Clé 'API_KEY' manquante.")
+    st.error("ERREUR : Clé 'API_KEY' manquante dans les Secrets Streamlit.")
 
 st.set_page_config(page_title="Veille Pyxis Support", layout="wide")
 
@@ -42,29 +44,32 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. MOTEUR IA : "ZERO TOLÉRANCE" SUR LES DOUBLONS ---
+# --- 4. MOTEUR IA : ANALYSE PROFONDE (TITRE + CONTENU) ---
 def traiter_ia_expert(liste_brute, service):
     if not liste_brute: return [], "Aucune actualité détectée."
     
-    titres_concat = "\n".join([f"- {a['title']} (URL: {a['url']})" for a in liste_brute])
+    # ON INJECTE MAINTENANT LE 'BODY' (EXTRAIT) POUR QUE L'IA VOIT QUE C'EST LA MÊME HISTOIRE
+    data_concat = "\n".join([f"ID: {a['url']}\nTITRE: {a['title']}\nEXTRAIT: {a.get('body', '')}\n---" for a in liste_brute])
     
-    # PROMPT DRASTIQUE
     prompt = f"""
-    Analyse ces articles pour le service {service}.
-    OBJECTIF : Diversité absolue.
-    1. Si tous les articles parlent du même sujet (ex: tous parlent d'une même loi), RENVOIE UNE SEULE URL. C'est impératif.
-    2. Ne renvoie JAMAIS 2 articles sur le même événement, même si les titres diffèrent légèrement.
-    3. Si tu trouves 4 sujets différents, renvoie 4 URLs. Sinon, renvoies-en 1, 2 ou 3 maximum.
-    Réponds uniquement par la liste des URLs.
-    Articles :
-    {titres_concat}
+    Tu es un éditeur en chef impitoyable pour le service {service}.
+    Ta mission : Éliminer la redondance médiatique.
+    
+    Règles strictes :
+    1. Lis les TITRES et les EXTRAITS.
+    2. Si plusieurs articles parlent du même événement (ex: Loi-cadre, Grève, Contrat spécifique), garde UNIQUEMENT l'article qui semble le plus informatif. Jette les autres.
+    3. Je préfère avoir 1 seul article pertinent que 4 articles répétitifs.
+    4. Ne sélectionne JAMAIS plus de 4 articles.
+    
+    Données à analyser :
+    {data_concat}
+    
+    Réponds UNIQUEMENT par la liste des IDs (URLs) retenues, une par ligne. Rien d'autre.
     """
     try:
         response = model.generate_content(prompt).text
         urls_uniques = [u.strip() for u in response.strip().split("\n") if "http" in u]
         final_list = [a for a in liste_brute if a['url'] in urls_uniques]
-        
-        # Sécurité : Si l'IA a quand même renvoyé des doublons, on coupe manuellement si les titres sont trop proches (optionnel, ici on fait confiance au prompt durci)
         return final_list[:4], "Fonctionnalité IA en cours de développement."
     except:
         return liste_brute[:4], "Fonctionnalité IA en cours de développement."
@@ -94,7 +99,7 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
         
         for attempt in range(2):
             try:
-                with st.spinner(f"Filtrage drastique pour {sujet}..."):
+                with st.spinner(f"Analyse approfondie pour {sujet}..."):
                     with DDGS() as ddgs:
                         raw = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=25))
                     if raw:
@@ -111,9 +116,8 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
             with col1:
                 st.markdown(f'<div class="analyse-box">💡 <b>Analyse IA :</b><br>{message_ia}</div>', unsafe_allow_html=True)
             with col2:
-                # Si l'IA n'a gardé qu'un seul article, on l'affiche, tant pis pour le vide
                 if len(actus) == 0:
-                    st.info("Aucun article pertinent identifié après filtrage des doublons.")
+                    st.info("Aucune actualité majeure unique détectée ce jour.")
                 for a in actus:
                     st.markdown(f"""<div class="article-card">
                         <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
