@@ -12,8 +12,7 @@ else:
 
 st.set_page_config(page_title="Veille Pyxis Support", layout="wide")
 
-# --- 2. DICTIONNAIRE DE RECHERCHE STRATÉGIQUE (Rétabli) ---
-# C'est ici que se joue la pertinence.
+# --- 2. DICTIONNAIRE DE RECHERCHE STRATÉGIQUE ---
 MOTS_CLES_STRATEGIQUES = {
     "Mobilités (Ferroviaire & Aéroportuaire)": "SNCF OR RER OR RATP OR 'Loi-cadre' OR 'Loi de programmation' OR 'Financement rail' OR 'Tramway'",
     "Externalisation (Marchés Publics & AMO)": "BOAMP OR 'Marchés publics' OR 'Commande publique' OR 'Conseil d'Etat' OR 'Assistance à maîtrise d'ouvrage' OR AMO",
@@ -24,18 +23,32 @@ MOTS_CLES_STRATEGIQUES = {
     "Administration, RH & DAF": "'Réforme RH' OR 'Gestion administrative' OR 'Finance d'entreprise' OR 'Externalisation RH'"
 }
 
-# --- 3. DESIGN ---
+# --- 3. DESIGN (CORRECTION TITRE INVISIBLE) ---
 st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF !important; }
+        
+        /* Correction Titre Principal : Noir profond forcé */
+        .main-title { 
+            color: #000000 !important; 
+            font-size: 35px !important; 
+            font-weight: 900 !important; 
+            text-align: center !important; 
+            margin-top: 10px !important;
+            margin-bottom: 30px !important;
+            display: block !important;
+        }
+
         [data-testid="stSidebar"] { background-color: #F0F2F6 !important; border-right: 2px solid #000; }
         [data-testid="stSidebar"] * { color: #000000 !important; font-weight: 700 !important; }
+        
         div.stButton > button:first-child {
             background-color: #F0F2F6 !important;
             color: #000000 !important;
             border: 1px solid #000000 !important;
             font-weight: bold !important;
         }
+        
         .titre-service { color: #000; font-weight: 900; font-size: 18px; border-bottom: 3px solid #C5A059; margin-top: 25px; }
         .article-card { background-color: #fdfdfd; padding: 12px; border: 1px solid #ddd; border-left: 8px solid #C5A059; border-radius: 5px; margin-bottom: 8px; }
         .analyse-box { background-color: #E3F2FD; border: 1px solid #2196F3; padding: 15px; border-radius: 8px; color: #1976D2; }
@@ -75,22 +88,20 @@ with st.sidebar:
         if c2.button("X", key=f"d_{s}"):
             st.session_state['sujets'].remove(s); st.rerun()
 
-st.markdown('<h1 style="text-align:center;">Veille Stratégique Opérationnelle</h1>', unsafe_allow_html=True)
+# TITRE CORRIGÉ AVEC CLASSE CSS
+st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', unsafe_allow_html=True)
 
+# --- 6. EXECUTION ---
 if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
     for sujet in st.session_state['sujets']:
         st.markdown(f'<div class="titre-service">📌 {sujet}</div>', unsafe_allow_html=True)
         
-        # On utilise le dictionnaire pour la recherche
         query = MOTS_CLES_STRATEGIQUES.get(sujet, sujet)
         
         try:
             with st.spinner(f"Analyse stratégique de {sujet}..."):
                 with DDGS() as ddgs:
-                    # On repasse à 25 résultats pour redonner du choix à l'IA
                     raw = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=25))
-                
-                # Pause pour éviter le blocage tout en étant efficace
                 time.sleep(1.5) 
             
             actus, message_ia = traiter_ia_expert(raw, sujet)
@@ -104,4 +115,4 @@ if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
                         <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black;"><b>{a['title']}</b></a><br>
                         <small>{a['source']}</small></div>""", unsafe_allow_html=True)
         except:
-            st.error(f"Erreur momentanée sur {sujet}. DuckDuckGo a peut-être limité la requête.")
+            st.error(f"Erreur momentanée sur {sujet}.")
