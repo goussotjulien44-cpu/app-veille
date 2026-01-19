@@ -26,13 +26,13 @@ MOTS_CLES_STRATEGIQUES = {
     "Administration, RH & DAF": "'Réforme RH' OR 'Gestion administrative' OR 'Finance d'entreprise' OR 'Externalisation RH'"
 }
 
-# --- 3. CLASSE GÉNÉRATION PDF ---
+# --- 3. CLASSE GÉNÉRATION PDF (CORRIGÉE) ---
 class PyxisPDF(FPDF):
     def header(self):
-        self.set_font('Arial', 'B', 16)
+        self.set_font('Helvetica', 'B', 16)
         self.set_text_color(0, 0, 0)
         self.cell(0, 10, 'VEILLE STRATÉGIQUE PYXIS SUPPORT', 0, 1, 'C')
-        self.set_font('Arial', '', 10)
+        self.set_font('Helvetica', '', 10)
         self.cell(0, 10, f'Généré le : {datetime.now().strftime("%d/%m/%Y à %H:%M")}', 0, 1, 'C')
         self.ln(10)
         self.set_draw_color(197, 160, 89) # Couleur Pyxis
@@ -40,7 +40,7 @@ class PyxisPDF(FPDF):
 
     def footer(self):
         self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
+        self.set_font('Helvetica', 'I', 8)
         self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
 
 def generer_pdf(resultats):
@@ -49,28 +49,36 @@ def generer_pdf(resultats):
     
     for service, articles in resultats.items():
         # Titre du Service
-        pdf.set_font('Arial', 'B', 12)
+        pdf.set_font('Helvetica', 'B', 12)
         pdf.set_fill_color(240, 242, 246)
-        pdf.cell(0, 10, f" SECTION : {service.upper()} ", 0, 1, 'L', fill=True)
+        # Gestion des caractères spéciaux basique via encode/decode pour éviter les erreurs latin-1
+        titre_service = f" SECTION : {service.upper()} "
+        pdf.cell(0, 10, titre_service, 0, 1, 'L', fill=True)
         pdf.ln(2)
         
         if not articles:
-            pdf.set_font('Arial', 'I', 10)
+            pdf.set_font('Helvetica', 'I', 10)
             pdf.cell(0, 10, "Aucun article sélectionné pour cette période.", 0, 1)
         else:
             for art in articles:
                 # Titre de l'article (cliquable)
-                pdf.set_font('Arial', 'B', 10)
+                pdf.set_font('Helvetica', 'B', 10)
                 pdf.set_text_color(0, 0, 255) # Bleu pour les liens
-                pdf.multi_cell(0, 6, f"- {art['title']}", 0, 'L', link=art['url'])
+                
+                # Nettoyage basique du titre pour le PDF
+                titre = art['title'].replace("’", "'").replace("“", '"').replace("”", '"')
+                
+                pdf.multi_cell(0, 6, f"- {titre}", 0, 'L', link=art['url'])
+                
                 # Source
-                pdf.set_font('Arial', '', 9)
+                pdf.set_font('Helvetica', '', 9)
                 pdf.set_text_color(100, 100, 100)
                 pdf.cell(0, 5, f"Source : {art['source']}", 0, 1)
                 pdf.ln(2)
         pdf.ln(5)
     
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+    # CORRECTION MAJEURE ICI : Renvoie directement les bytes sans encodage obsolète
+    return bytes(pdf.output())
 
 # --- 4. DESIGN STREAMLIT ---
 st.markdown("""
@@ -123,14 +131,17 @@ st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', u
 
 # Zone de téléchargement PDF (visible uniquement si des résultats existent)
 if st.session_state['last_results']:
-    pdf_data = generer_pdf(st.session_state['last_results'])
-    st.download_button(
-        label="📥 TÉLÉCHARGER LE RAPPORT COMPLET (PDF)",
-        data=pdf_data,
-        file_name=f"Veille_Pyxis_{datetime.now().strftime('%d_%m_%Y')}.pdf",
-        mime="application/pdf",
-        use_container_width=True
-    )
+    try:
+        pdf_data = generer_pdf(st.session_state['last_results'])
+        st.download_button(
+            label="📥 TÉLÉCHARGER LE RAPPORT COMPLET (PDF)",
+            data=pdf_data,
+            file_name=f"Veille_Pyxis_{datetime.now().strftime('%d_%m_%Y')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du PDF : {e}")
 
 if st.button("LANCER LA VEILLE INTELLIGENTE 🚀", use_container_width=True):
     st.session_state['last_results'] = {} # Reset
