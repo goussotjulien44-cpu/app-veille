@@ -8,7 +8,7 @@ import requests
 import urllib.parse
 
 # --- CONFIGURATION FONCTIONNALITÉS ---
-AFFICHER_EXPORT_PDF = False  # Changez à True pour réactiver si besoin
+AFFICHER_EXPORT_PDF = False  # Masqué selon votre demande précédente
 
 # --- 1. CONFIGURATION IA ---
 if "API_KEY" in st.secrets:
@@ -41,7 +41,7 @@ def verifier_lien_actif(url):
     except:
         return False
 
-# --- 4. LOGIQUE PDF (EN RÉSERVE) ---
+# --- 4. LOGIQUE PDF (EN RÉSERVE / MASQUÉE) ---
 class PyxisPDF(FPDF):
     def header(self):
         self.set_font('Helvetica', 'B', 16)
@@ -58,18 +58,28 @@ def generer_pdf(resultats):
         pdf.set_font('Helvetica', 'B', 12)
         pdf.cell(0, 10, f"SECTION : {service.upper()}", 0, 1)
         for art in data['articles']:
-            # Tentative d'encodage URL ultra-propre pour le PDF
             safe_url = urllib.parse.quote(art['url'], safe='/:?=&')
             pdf.set_font('Helvetica', '', 10)
             pdf.write(5, f"- {art['title']}\n", safe_url)
             pdf.ln(2)
     return bytes(pdf.output())
 
-# --- 5. INTERFACE ET DESIGN ---
+# --- 5. INTERFACE ET DESIGN (CORRECTION DU CONTRASTE ICI) ---
 st.markdown("""
     <style>
         .stApp { background-color: #FFFFFF !important; }
-        .main-title { color: #000; font-size: 35px; font-weight: 900; text-align: center; margin-bottom: 30px; }
+        
+        /* Correction contraste titre principal */
+        .main-title { 
+            color: #1a1a1a !important; 
+            font-size: 38px !important; 
+            font-weight: 900 !important; 
+            text-align: center !important; 
+            margin-bottom: 30px !important;
+            opacity: 1 !important;
+            display: block !important;
+        }
+        
         .titre-service { color: #000; font-weight: 900; font-size: 18px; border-bottom: 3px solid #C5A059; margin-top: 25px; }
         .article-card { background-color: #fdfdfd; padding: 12px; border: 1px solid #ddd; border-left: 8px solid #C5A059; border-radius: 5px; margin-bottom: 8px; }
         .analyse-box { background-color: #E3F2FD; border: 1px solid #2196F3; padding: 15px; border-radius: 8px; color: #1976D2; }
@@ -94,51 +104,5 @@ if 'last_results' not in st.session_state:
 if 'sujets' not in st.session_state:
     st.session_state['sujets'] = list(MOTS_CLES_STRATEGIQUES.keys())
 
-st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', unsafe_allow_html=True)
-
-if st.button("LANCER LA VEILLE GÉNÉRALE 🚀", use_container_width=True):
-    st.session_state['last_results'] = {}
-    for sujet in st.session_state['sujets']:
-        with st.status(f"Recherche : {sujet}...", expanded=False) as status:
-            query = MOTS_CLES_STRATEGIQUES.get(sujet, sujet)
-            raw = []
-            try:
-                with DDGS() as ddgs:
-                    raw = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=20))
-            except: time.sleep(2)
-            
-            if raw:
-                actus_ia, msg = traiter_ia_expert(raw, sujet)
-                actus_finales = [a for a in actus_ia if verifier_lien_actif(a['url'])]
-                st.session_state['last_results'][sujet] = {'articles': actus_finales, 'analysis': msg}
-                status.update(label=f"✅ {sujet} terminé", state="complete")
-            else:
-                st.session_state['last_results'][sujet] = {'articles': [], 'analysis': "Aucun résultat."}
-                status.update(label=f"❌ {sujet} : Vide", state="error")
-            time.sleep(1)
-    st.rerun()
-
-# AFFICHAGE DES RÉSULTATS
-if st.session_state['last_results']:
-    
-    # BOUTON PDF (Affiché seulement si activé dans la config en haut)
-    if AFFICHER_EXPORT_PDF:
-        try:
-            pdf_bytes = generer_pdf(st.session_state['last_results'])
-            st.download_button("📥 TÉLÉCHARGER LE RAPPORT PDF", pdf_bytes, "Veille_Pyxis.pdf", "application/pdf", use_container_width=True)
-        except: st.warning("Le module PDF est en maintenance.")
-
-    for sujet, data in st.session_state['last_results'].items():
-        st.markdown(f'<div class="titre-service">📌 {sujet}</div>', unsafe_allow_html=True)
-        col_ia, col_art = st.columns([1, 1.4])
-        with col_ia:
-            st.markdown(f'<div class="analyse-box">💡 {data["analysis"]}</div>', unsafe_allow_html=True)
-        with col_art:
-            if not data['articles']: st.info("Aucun article pertinent.")
-            for a in data['articles']:
-                st.markdown(f"""
-                <div class="article-card">
-                    <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black; font-weight:bold;">{a['title']}</a><br>
-                    <small style="color:gray;">Source : {a['source']}</small>
-                </div>
-                """, unsafe_allow_html=True)
+# Application du titre avec la classe corrigée
+st.markdown('<h1 class
