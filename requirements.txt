@@ -1,4 +1,5 @@
-google-generativeai
-duckduckgo_search
 streamlit
+duckduckgo_search
+google-generativeai
 fpdf2
+requests
