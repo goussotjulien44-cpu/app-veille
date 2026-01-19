@@ -105,4 +105,59 @@ if 'sujets' not in st.session_state:
     st.session_state['sujets'] = list(MOTS_CLES_STRATEGIQUES.keys())
 
 # Application du titre avec la classe corrigée
-st.markdown('<h1 class
+st.markdown('<h1 class="main-title">Veille Stratégique Opérationnelle</h1>', unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("### ⚖️ PYXIS SUPPORT")
+    st.write("---")
+    for s in list(st.session_state['sujets']):
+        c1, c2 = st.columns([5, 1.2])
+        c1.write(s)
+        if c2.button("X", key=f"d_{s}"):
+            st.session_state['sujets'].remove(s)
+            st.rerun()
+
+if st.button("LANCER LA VEILLE GÉNÉRALE 🚀", use_container_width=True):
+    st.session_state['last_results'] = {}
+    for sujet in st.session_state['sujets']:
+        with st.status(f"Recherche : {sujet}...", expanded=False) as status:
+            query = MOTS_CLES_STRATEGIQUES.get(sujet, sujet)
+            raw = []
+            try:
+                with DDGS() as ddgs:
+                    raw = list(ddgs.news(query, region="fr-fr", timelimit="w", max_results=20))
+            except: time.sleep(2)
+            
+            if raw:
+                actus_ia, msg = traiter_ia_expert(raw, sujet)
+                actus_finales = [a for a in actus_ia if verifier_lien_actif(a['url'])]
+                st.session_state['last_results'][sujet] = {'articles': actus_finales, 'analysis': msg}
+                status.update(label=f"✅ {sujet} terminé", state="complete")
+            else:
+                st.session_state['last_results'][sujet] = {'articles': [], 'analysis': "Aucun résultat."}
+                status.update(label=f"❌ {sujet} : Vide", state="error")
+            time.sleep(1)
+    st.rerun()
+
+# AFFICHAGE DES RÉSULTATS
+if st.session_state['last_results']:
+    if AFFICHER_EXPORT_PDF:
+        try:
+            pdf_bytes = generer_pdf(st.session_state['last_results'])
+            st.download_button("📥 TÉLÉCHARGER LE RAPPORT PDF", pdf_bytes, "Veille_Pyxis.pdf", "application/pdf", use_container_width=True)
+        except: st.warning("Le module PDF est en maintenance.")
+
+    for sujet, data in st.session_state['last_results'].items():
+        st.markdown(f'<div class="titre-service">📌 {sujet}</div>', unsafe_allow_html=True)
+        col_ia, col_art = st.columns([1, 1.4])
+        with col_ia:
+            st.markdown(f'<div class="analyse-box">💡 {data["analysis"]}</div>', unsafe_allow_html=True)
+        with col_art:
+            if not data['articles']: st.info("Aucun article pertinent.")
+            for a in data['articles']:
+                st.markdown(f"""
+                <div class="article-card">
+                    <a href="{a['url']}" target="_blank" style="text-decoration:none; color:black; font-weight:bold;">{a['title']}</a><br>
+                    <small style="color:gray;">Source : {a['source']}</small>
+                </div>
+                """, unsafe_allow_html=True)
